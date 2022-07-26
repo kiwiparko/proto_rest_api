@@ -40,6 +40,7 @@ def action_fetch_by_id(_id: int, api_key: APIKey = Depends(get_api_key),
                   "action_id": 3,
                   "action": "sub sub Action 1",
                   "group": "SOON",
+                  "tags": [{"name": "work", "color": "#b0c4de"}],
                   "created_on": "2022-07-26T10:24:49.959Z",
                   "updated_on": "2022-07-26T10:24:49.959Z",
                   "notes": [
@@ -52,13 +53,14 @@ def action_fetch_by_id(_id: int, api_key: APIKey = Depends(get_api_key),
                 }
               ],
               "group": "SOON",
+              "tags": [{"name": "work", "color": "#b0c4de"}],
               "created_on": "2022-07-26T10:24:49.959Z",
               "updated_on": "2022-07-26T10:24:49.959Z",
               "notes": [ ]
             }
           ],
           "group": "SOON",
-          "tags": "<tag.name>",
+          "tags": [{"name": "work", "color": "#b0c4de"}],
           "created_on": "2022-07-26T10:24:49.959Z",
           "updated_on": "2022-07-26T10:24:49.959Z",
           "notes": [
@@ -85,15 +87,18 @@ def action_fetch_by_action_name(action_name: str, api_key: APIKey = Depends(get_
         Ответ:
         [
           {
+            "action_id": 1,
             "action": "My first Action",
             "children": [
               {
+                "action_id": 2,
                 "action": "sub Action 1",
                 "group": "SOON",
                 "created_on": "2022-07-26T10:24:49.959Z",
                 "updated_on": "2022-07-26T10:24:49.959Z"
               },
               {
+                "action_id": 3,
                 "action": "sub Action 2",
                 "group": "SOON",
                 "created_on": "2022-07-26T10:24:49.959Z",
@@ -101,7 +106,7 @@ def action_fetch_by_action_name(action_name: str, api_key: APIKey = Depends(get_
               }
             ],
             "group": "SOON",
-            "tags": "<tag.name>",
+            "tags": [{"name": "work", "color": "#b0c4de"}],
             "created_on": "2022-07-26T10:24:49.959Z",
             "updated_on": "2022-07-26T10:24:49.959Z"
           }
