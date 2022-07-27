@@ -2,7 +2,7 @@ import yaml
 from sqlalchemy import create_engine, desc
 from sqlalchemy.orm import sessionmaker, Session
 
-from model import PydanticAction, Action
+from model import PydanticAction, Action, Action_Tag, Group, Tag, Note
 
 with open('settings.yml') as config_file:
     config = yaml.load(config_file, Loader=yaml.FullLoader)
@@ -48,19 +48,140 @@ class ActionAlchemyRepository(object):
         result = self.create(orm_action, return_pydantic=return_pydantic)
         return result
 
-    def fetch_by_id(self, _id):
-        return self.db.query(Action).filter(Action.id == _id).first()
+    def note_match(self, _id):
+        try:
+            output = (self.db.query(Note)
+                      .filter(
+                            Note.action_id == _id
+                            )
+                      .all()
+                      )
+            try:
+                a = output[0]
+            except:
+                raise AttributeError
+        except AttributeError: #вероятен NoneType
+            output = None
+        return output
 
-    def fetch_by_action(self, action):
-        return self.db.query(Action).filter(Action.action == action).first()
+    def group_match(self, _id):
+        return (self.db.query(Group)
+                .filter(
+                   Group.id == _id
+                   )
+                .all()
+                )
+
+    def tag_match(self, _id):
+        try:
+            action_tag = (self.db.query(Action_Tag)
+                          .filter(
+                                Action_Tag.action_id == _id
+                                )
+                          .first()
+                          )
+            actual_tag = (self.db.query(Tag)
+                          .filter(
+                                Tag.id == action_tag.tag_id
+                                )
+                          )
+        except AttributeError: #искренне надеюсь что тут только NoneType вылетает
+            actual_tag = None
+        return actual_tag
+
+    def child_match(self, _id):
+        try:
+            output = (self.db.query(Action)
+                     .filter(
+                         Action.parent_id == _id
+                         )
+                     .all()
+                     )
+            for i in range(output.__len__()):
+                if output[i].group_id is None:
+                    output[i].group = None
+                else:
+                    output[i].group = self.group_match(output[i].id)
+
+                output[i].tag = self.tag_match(output[i].id)
+
+                output[i].note = self.note_match(output[i].id)
+        except AttributeError: #вдвойне усерднее надеюсь на NoneType
+            output = None
+        return output
+
+    def fetch_by_action_id(self, _id):
+        main_action = (self.db.query(Action)
+                       .filter(
+            Action.id == _id
+        )
+                       .all()
+                       )
+
+        if main_action[0].group_id is None:
+            main_action[0].group = None
+        else:
+            main_action[0].group = self.group_match(main_action[0].id)
+
+        main_action[0].tag = self.tag_match(main_action[0].id)
+
+        main_action[0].note = self.note_match(main_action[0].id)
+
+        main_action[0].children = self.child_match(main_action[0].id)
+        for i in range(main_action[0].children.__len__()):
+            main_action[0].children[i].children = self.child_match(main_action[0].children[i].id)
+        return main_action
+
+    def fetch_by_action_name(self, name):
+        main_action = (self.db.query(Action)
+                       .filter(
+                            Action.action.like(f'%{name}%')
+                            )
+                       .limit(20)
+                       .all()
+                       )
+
+        for i in range(len(main_action)):
+
+            #group vibe check
+            if main_action[i].group_id is None:
+                main_action[i].group = None
+            else:
+                main_action[i].group = self.group_match(main_action[i].id)
+
+            #tag vibe check
+            main_action[i].tag = self.tag_match(main_action[i].id)
+
+            children_action = (self.db.query(Action)
+                               .filter(
+                                    Action.parent_id == main_action[i].id
+                                    )
+                               .all()
+                               )
+            if not children_action:
+                continue
+            else:
+                for j in range(len(children_action)):
+                    if children_action[j].group_id is None:
+                        children_action[j].group = None
+                    else:
+                        children_action[j].group = self.group_match(children_action[j].id)
+                    children_action[j].tag = self.tag_match(children_action[j].id)
+                main_action[i].children = children_action
+        return main_action
+
+
+
 
     def fetch_all(self, skip: int = 0, limit: int = 100):
-        return ( self.db.query(Action)
-                 .offset(skip)
-                 .limit(limit)
-                 .order_by(desc(Action.updated_on))
-                 .all()
-               )
+        return (self.db.query(Action)
+                .offset(skip)
+                .limit(limit)
+                .order_by(
+                    desc(Action.updated_on)
+                    )
+                .all()
+                )
 
     async def delete(self, item_id):
         db_item = self.db.query(Action).filter_by(id=item_id).first()
