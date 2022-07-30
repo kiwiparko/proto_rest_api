@@ -21,9 +21,6 @@ class Action(Base):
     action = Column(String(255), nullable=False)
     parent_id = Column(Integer, ForeignKey('actions.id'), nullable=True)
     group_id = Column(Integer, ForeignKey('groups.id'))
-    group = relationship("Group")
-    tags = relationship("Action_Tag", backref='action')
-    notes = relationship("Note")
     created_on = Column(DateTime(), default=datetime.now)
     updated_on = Column(DateTime(), default=datetime.now, onupdate=datetime.now)
 
