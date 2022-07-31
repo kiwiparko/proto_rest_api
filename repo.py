@@ -3,7 +3,7 @@ import yaml
 from sqlalchemy import create_engine, desc, update
 from sqlalchemy.orm import sessionmaker, Session
 
-from model import PydanticAction, Action, Action_Tag, Group, Tag, Note
+from model import PydanticAction, PydanticNote, Action, Action_Tag, Group, Tag, Note
 
 with open('settings.yml') as config_file:
     config = yaml.load(config_file, Loader=yaml.FullLoader)
@@ -172,7 +172,6 @@ class ActionAlchemyRepository(object):
             main_action = None
         return main_action
 
-
     def fetch_by_action_name(self, name):
         main_action = (self.db.query(Action)
                        .filter(
@@ -206,6 +205,82 @@ class ActionAlchemyRepository(object):
         self.db.commit()
 
 
+class NoteAlchemyRepository(object):
+    def __init__(self):
+        self.db = SessionLocal()
+
+    @staticmethod
+    def _orm_to_pydantic(orm_note: Note) -> PydanticNote:
+        pydantic_note = PydanticAction.from_orm(orm_note)
+        return pydantic_note
+
+    @staticmethod
+    def _pydantic_to_orm(pydantic_note: PydanticNote) -> Note:
+        note = Note(
+            action_id=pydantic_note.action_id,
+            type=pydantic_note.type,
+            payload=pydantic_note.payload
+        )
+        return note
+
+    def create(self, item: Note, return_pydantic=True):
+        self.db.add(item)
+        self.db.commit()
+        self.db.refresh(item)
+        if return_pydantic:
+            return PydanticNote.from_orm(item)
+        return item
+
+    def update(self, item: Note, item_id, return_pydantic=True):
+        tbc = self.db.query(Note).filter(Note.id == item_id).first()
+        tbc.action_id = item.action_id
+        tbc.type = item.type
+        tbc.payload = item.payload
+        self.db.commit()
+        if return_pydantic:
+            return PydanticNote.from_orm(item)
+        return item
+
+    def create_pydantic(self, item: PydanticNote, return_pydantic=True):
+        orm_note = self._pydantic_to_orm(item)
+        result = self.create(orm_note, return_pydantic=return_pydantic)
+        return result
+
+    def update_pydantic(self, item: PydanticNote, item_id, return_pydantic=True):
+        try:
+            orm_note = self._pydantic_to_orm(item)
+            result = self.update(orm_note, item_id, return_pydantic=return_pydantic)
+        except AttributeError:
+            result = 'no rows with such id'
+        except sqlalchemy.exc.IntegrityError:
+            result = 'no action with such id'
+        return result
+
+    def note_fetch_by_id(self, _id):
+        try:
+            note = (self.db.query(Note)
+                    .filter(Note.id == _id)
+                    .all()
+                    )
+            try:
+                a = note[0]
+            except:
+                raise AttributeError
+        except AttributeError:
+            note = 'no rows with such id'
+        return note
+
+    def note_delete(self, _id):
+        note = (self.db.query(Note)
+                .filter(Note.id == _id)
+                .delete()
+                )
+        self.db.commit()
+        if note == 1:
+            return 'deleted'
+        else:
+            return 'no rows with such id'
+
 
 # Dependency
 def get_action_repo():
@@ -215,3 +290,9 @@ def get_action_repo():
     finally:
         pass
 
+def get_note_repo():
+    repo = NoteAlchemyRepository()
+    try:
+        yield repo
+    finally:
+        pass
