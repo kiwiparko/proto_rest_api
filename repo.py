@@ -1,9 +1,10 @@
 import sqlalchemy.exc
 import yaml
-from sqlalchemy import create_engine, desc, update
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy import create_engine, desc
+from sqlalchemy.orm import sessionmaker
 
-from model import PydanticAction, PydanticNote, PydanticGroup, PydanticTag, Action, Action_Tag, Group, Tag, Note
+
+from model import PydanticAction, PydanticNote, PydanticGroup, Action, Action_Tag, Group, Tag, Note
 
 with open('settings.yml') as config_file:
     config = yaml.load(config_file, Loader=yaml.FullLoader)
@@ -33,38 +34,34 @@ class ActionAlchemyRepository(object):
         )
         return action
 
-    def create(self, item: Action, return_pydantic=True):
+    def create(self, item: Action):
         self.db.add(item)
         self.db.commit()
         self.db.refresh(item)
-        if return_pydantic:
-            return PydanticAction.from_orm(item)
         return item
 
-    def update(self, item: Action, item_id, return_pydantic=True):
+    def update(self, item: Action, item_id):
         tbc = self.db.query(Action).filter(Action.id == item_id).first()
         tbc.action = item.action
         tbc.parent_id = item.parent_id
         tbc.group_id = item.group_id
         tbc.updated_on = item.updated_on
         self.db.commit()
-        if return_pydantic:
-            return PydanticAction.from_orm(item)
         return item
 
-    def create_pydantic(self, item: PydanticAction, return_pydantic=True):
+    def create_pydantic(self, item: PydanticAction):
         orm_action = self._pydantic_to_orm(item)
-        result = self.create(orm_action, return_pydantic=return_pydantic)
+        result = self.create(orm_action)
         return result
 
-    def update_pydantic(self, item: PydanticAction, item_id, return_pydantic=True):
+    def update_pydantic(self, item: PydanticAction, item_id):
         try:
             orm_action = self._pydantic_to_orm(item)
-            result = self.update(orm_action, item_id, return_pydantic=return_pydantic)
+            result = self.update(orm_action, item_id)
         except AttributeError:
-            result = 'no rows with such id'
+            return
         except sqlalchemy.exc.IntegrityError:
-            result = 'no group/parent with such id'
+            return {'detail': 'no group/parent with such id'}
         return result
 
     def note_match(self, _id):
@@ -79,7 +76,7 @@ class ActionAlchemyRepository(object):
                 note = output[0]
             except:
                 raise AttributeError
-        except AttributeError: #вероятен NoneType
+        except AttributeError: # вероятен NoneType
             note = None
         return note
 
@@ -88,8 +85,8 @@ class ActionAlchemyRepository(object):
                 .filter(
                    Group.id == _id
                    )
-                .all()
-                )[0].name
+                .first()
+                ).name
 
     def tag_match(self, _id):
         try:
@@ -108,7 +105,7 @@ class ActionAlchemyRepository(object):
                 "name": actual_tag.name,
                 "color": actual_tag.color
             }
-        except AttributeError: #искренне надеюсь что тут только NoneType вылетает
+        except AttributeError:  # искренне надеюсь что тут только NoneType вылетает
             full_tag = None
         return full_tag
 
@@ -131,36 +128,36 @@ class ActionAlchemyRepository(object):
                 output[i].note = self.note_match(output[i].id)
 
                 output[i].children = self.child_match(output[i].id)
-                try:
-                    a = output[i].children[0]
-                except:
+                if output[i].children.__len__() == 0:
                     output[i].children = None
-        except AttributeError: #вдвойне усерднее надеюсь на NoneType
+        except AttributeError: # вдвойне усерднее надеюсь на NoneType
             output = None
         return output
 
     def fetch_by_action_id(self, _id):
         main_action = (self.db.query(Action)
                        .filter(
-            Action.id == _id
-        )
-                       .all()
+                            Action.id == _id
+                            )
+                       .first()
                        )
+        if main_action is None:
+            return
 
-        if main_action[0].group_id is None:
-            main_action[0].group = None
+        if main_action.group_id is None:
+            main_action.group = None
         else:
-            main_action[0].group = self.group_match(main_action[0].group_id)
+            main_action.group = self.group_match(main_action.group_id)
 
-        main_action[0].tag = self.tag_match(main_action[0].id)
+        main_action.tag = self.tag_match(main_action.id)
 
-        main_action[0].note = self.note_match(main_action[0].id)
+        main_action.note = self.note_match(main_action.id)
 
-        main_action[0].children = self.child_match(main_action[0].id)
-        try:
-            a = main_action[0].children[0]
-        except:
-            main_action[0].children = None
+        main_action.children = self.child_match(main_action.id)
+
+        if main_action.children.__len__() == 0:
+            main_action.children = None
+
         return main_action
 
     def dogshit(self, _id):
@@ -231,51 +228,45 @@ class NoteAlchemyRepository(object):
         )
         return note
 
-    def create(self, item: Note, return_pydantic=True):
+    def create(self, item: Note):
         self.db.add(item)
         self.db.commit()
         self.db.refresh(item)
-        if return_pydantic:
-            return PydanticNote.from_orm(item)
         return item
 
-    def update(self, item: Note, item_id, return_pydantic=True):
+    def update(self, item: Note, item_id):
         tbc = self.db.query(Note).filter(Note.id == item_id).first()
         tbc.action_id = item.action_id
         tbc.type = item.type
         tbc.payload = item.payload
         self.db.commit()
-        if return_pydantic:
-            return PydanticNote.from_orm(item)
         return item
 
-    def create_pydantic(self, item: PydanticNote, return_pydantic=True):
+    def create_pydantic(self, item: PydanticNote):
         orm_note = self._pydantic_to_orm(item)
-        result = self.create(orm_note, return_pydantic=return_pydantic)
+        result = self.create(orm_note)
         return result
 
-    def update_pydantic(self, item: PydanticNote, item_id, return_pydantic=True):
+    def update_pydantic(self, item: PydanticNote, item_id):
         try:
             orm_note = self._pydantic_to_orm(item)
-            result = self.update(orm_note, item_id, return_pydantic=return_pydantic)
+            result = self.update(orm_note, item_id)
         except AttributeError:
-            result = 'no rows with such id'
+            return
         except sqlalchemy.exc.IntegrityError:
-            result = 'no action with such id'
+            return
         return result
 
     def note_fetch_by_id(self, _id):
         try:
             note = (self.db.query(Note)
                     .filter(Note.id == _id)
-                    .all()
+                    .first()
                     )
-            try:
-                a = note[0]
-            except:
+            if note is None:
                 raise AttributeError
         except AttributeError:
-            note = 'no rows with such id'
+            return
         return note
 
     def note_delete(self, _id):
@@ -285,9 +276,9 @@ class NoteAlchemyRepository(object):
                 )
         self.db.commit()
         if note == 1:
-            return 'deleted'
+            return {'detail': 'deleted'}
         else:
-            return 'no rows with such id'
+            return
 
 
 class GroupAlchemyRepository(object):
@@ -306,39 +297,37 @@ class GroupAlchemyRepository(object):
         )
         return group
 
-    def create(self, item: Group, return_pydantic=True):
+    def create(self, item: Group):
         self.db.add(item)
         self.db.commit()
         self.db.refresh(item)
-        if return_pydantic:
-            return PydanticGroup.from_orm(item)
         return item
 
-    def update(self, item: Group, item_id, return_pydantic=True):
+    def update(self, item: Group, item_id):
         tbc = self.db.query(Group).filter(Group.id == item_id).first()
         tbc.name = item.name
         self.db.commit()
-        if return_pydantic:
-            return PydanticGroup.from_orm(item)
         return item
 
-    def create_pydantic(self, item: PydanticGroup, return_pydantic=True):
+    def create_pydantic(self, item: PydanticGroup):
         orm_group = self._pydantic_to_orm(item)
-        result = self.create(orm_group, return_pydantic=return_pydantic)
+        result = self.create(orm_group)
         return result
 
-    def update_pydantic(self, item: PydanticGroup, item_id, return_pydantic=True):
+    def update_pydantic(self, item: PydanticGroup, item_id):
         try:
             orm_group = self._pydantic_to_orm(item)
-            result = self.update(orm_group, item_id, return_pydantic=return_pydantic)
+            result = self.update(orm_group, item_id)
         except AttributeError:
-            result = 'no rows with such id'
+            return
         return result
 
     def fetch_all_groups(self):
         groups = (self.db.query(Group)
                   .all()
                   )
+        if groups.__len__() == 0:
+            return
         return groups
 
     def group_delete(self, _id):
@@ -355,9 +344,9 @@ class GroupAlchemyRepository(object):
                  )
         self.db.commit()
         if group == 1:
-            return 'deleted'
+            return {'detail': 'deleted'}
         else:
-            return 'no rows with such id'
+            return
 
 
 # Dependency
