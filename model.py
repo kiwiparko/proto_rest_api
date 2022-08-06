@@ -51,6 +51,7 @@ class Note(Base):
 PydanticAction = sqlalchemy_to_pydantic(Action, exclude=['id'])
 PydanticGroup = sqlalchemy_to_pydantic(Group, exclude=['id'])
 PydanticTag = sqlalchemy_to_pydantic(Tag, exclude=['id'])
+PydanticActionTag = sqlalchemy_to_pydantic(Action_Tag, exclude=['id'])
 PydanticNote = sqlalchemy_to_pydantic(Note, exclude=['id'])
 
 
